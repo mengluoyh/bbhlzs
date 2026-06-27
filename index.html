@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>宝宝护理助手</title>
+  <meta name="theme-color" content="#e07a5f">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <link rel="manifest" href="manifest.json">
+  <meta name="application-name" content="宝宝护理">
+  <meta name="mobile-web-app-capable" content="yes">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, -apple-system, sans-serif; background: #f5f0eb; color: #333; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+    body.alarming { background: #ffebee; }
+    .page { display: none; flex: 1; overflow-y: auto; padding: 20px; }
+    .page.active { display: block; }
+    .card { background: #fff; border-radius: 20px; padding: 24px; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+    .time-set { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .time-set input { flex: 1; min-width: 80px; padding: 12px; font-size: 20px; text-align: center; border: 2px solid #ddd; border-radius: 12px; outline: none; }
+    .time-set input:focus { border-color: #e07a5f; }
+    .time-set span { font-size: 18px; font-weight: 500; }
+    .btn { padding: 14px 28px; border: none; border-radius: 30px; font-size: 18px; font-weight: 600; cursor: pointer; transition: .2s; }
+    .btn-primary { background: #e07a5f; color: #fff; }
+    .btn-feed { width: 100%; padding: 24px; font-size: 28px; background: #81b29a; color: #fff; margin-top: 16px; }
+    .btn-excrete { width: 100%; padding: 24px; font-size: 22px; background: #b5838d; color: #fff; margin-top: 16px; }
+    .timer { font-size: 52px; text-align: center; font-weight: 700; color: #e07a5f; margin: 20px 0; }
+    .record-list { list-style: none; }
+    .record-item { padding: 12px 0; border-bottom: 1px solid #f0f0f0; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .record-item:last-child { border-bottom: none; }
+    .record-left { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+    .record-time { font-size: 14px; font-weight: 500; }
+    .record-interval { font-size: 12px; color: #888; }
+    .record-detail { font-size: 12px; color: #666; margin-top: 1px; }
+    .record-type { font-size: 12px; background: #eee; padding: 2px 10px; border-radius: 12px; white-space: nowrap; }
+    .record-type.auto { background: #f2cc8f; color: #fff; }
+    .record-type.manual { background: #81b29a; color: #fff; }
+    .empty { text-align: center; color: #999; padding: 40px; }
+    .clear-btn, .export-btn { background: none; color: #999; text-decoration: underline; font-size: 14px; cursor: pointer; display: inline-block; }
+    .permission-warning { background: #fff3cd; padding: 12px; border-radius: 8px; margin-bottom: 16px; font-size: 14px; color: #856404; display: none; }
+    .alarm-indicator { position: fixed; top: 0; left: 0; width: 100%; height: 4px; background: #e07a5f; animation: pulse 0.5s infinite; display: none; z-index: 10; }
+    @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.2; } 100% { opacity: 1; } }
+    body.alarming .alarm-indicator { display: block; }
+    .toast-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+    .toast-box { background: #fff; padding: 40px; border-radius: 20px; text-align: center; max-width: 90vw; }
+    .toast-box h2 { margin-bottom: 20px; color: #e07a5f; }
+    .toast-box button { margin-top: 20px; padding: 14px 40px; background: #81b29a; color: #fff; border: none; border-radius: 30px; font-size: 18px; cursor: pointer; }
+    .feed-options, .excrete-options { display: flex; gap: 10px; margin-top: 16px; align-items: center; flex-wrap: wrap; }
+    .feed-options label, .excrete-options label { font-size: 16px; font-weight: 500; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+    .feed-options input[type="radio"], .excrete-options input[type="radio"] { display: none; }
+    .type-btn { padding: 8px 16px; border-radius: 20px; background: #eee; color: #666; transition: .2s; font-size: 16px; }
+    .type-btn.active { background: #f4a261; color: #fff; }
+    .type-btn.formula-active { background: #a8dadc; color: #333; }
+    .volume-input { display: flex; align-items: center; gap: 12px; margin-top: 16px; }
+    .volume-input input, .volume-input select { flex: 1; padding: 12px; font-size: 16px; border: 2px solid #ddd; border-radius: 12px; outline: none; text-align: center; }
+    .volume-input input:focus, .volume-input select:focus { border-color: #e07a5f; }
+    .volume-input span { font-size: 16px; font-weight: 500; }
+    .volume-input.disabled { opacity: 0.5; pointer-events: none; }
+    .btn-pause { width: 100%; padding: 16px; font-size: 20px; background: #e0a96d; color: #fff; margin-top: 16px; border-radius: 30px; }
+    .btn-pause.resume { background: #6d8ea0; }
+    .top-nav { display: flex; background: #fff; border-bottom: 2px solid #ddd; position: sticky; top: 0; z-index: 5; }
+    .nav-item { flex: 1; text-align: center; padding: 10px 0; font-size: 13px; font-weight: 600; color: #888; cursor: pointer; transition: .2s; }
+    .nav-item.active { color: #e07a5f; }
+    .nav-item span { display: block; font-size: 18px; }
+    .audio-control { display: flex; align-items: center; gap: 12px; background: #fff; border-radius: 15px; padding: 12px 20px; margin-top: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+    .audio-control span { font-size: 14px; font-weight: 600; flex: 1; }
+    .audio-control button { padding: 8px 20px; background: #e07a5f; color: #fff; border: none; border-radius: 20px; font-size: 14px; cursor: pointer; }
+    .audio-control.hidden { display: none; }
+    .delete-btn { background: none; border: none; color: #cc6666; font-size: 16px; cursor: pointer; padding: 4px 8px; line-height: 1; }
+    .recent-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .recent-header span { font-size: 15px; font-weight: 600; }
+    .recent-toggle { font-size: 12px; color: #999; cursor: pointer; user-select: none; }
+    .recent-actions { display: flex; gap: 12px; margin-top: 8px; }
+    .recent-actions .clear-btn { margin: 0; font-size: 13px; }
+  </style>
+</head>
+<body>
+
+<div class="alarm-indicator"></div>
+
+<!-- ===== 顶部导航 ===== -->
+<div class="top-nav">
+  <div class="nav-item active" data-page="timer"><span>⏱️</span>喂奶计时</div>
+  <div class="nav-item" data-page="records"><span>📋</span>喂奶记录</div>
+  <div class="nav-item" data-page="excrete"><span>🚽</span>排泄记录</div>
+</div>
+
+<!-- ===== 喂奶计时页 ===== -->
+<div id="page-timer" class="page active">
+  <div class="card">
+    <div class="permission-warning" id="permissionWarning"></div>
+    <div style="font-size:18px; font-weight:600; margin-bottom:12px;">⏰ 自定义间隔（分钟）</div>
+    <div class="time-set">
+      <input type="number" id="intervalInput" min="1" max="1440" value="180" placeholder="分钟">
+      <span>分钟</span>
+      <button class="btn btn-primary" id="setIntervalBtn">设置并开始</button>
+    </div>
+    <div class="timer" id="countdownDisplay">--:--:--</div>
+    <div style="text-align:center; color:#666; font-size:14px;" id="countdownLabel">下次定时喂奶倒计时</div>
+    <button class="btn btn-pause" id="pauseBtn" disabled>⏸️ 暂停</button>
+    <div class="feed-options">
+      <span style="font-weight:600;">喂奶类型：</span>
+      <label><input type="radio" name="feedType" value="breast" id="feedTypeBreast"><span class="type-btn" id="breastLabel">🤱 母乳</span></label>
+      <label><input type="radio" name="feedType" value="formula" id="feedTypeFormula" checked><span class="type-btn formula-active" id="formulaLabel">🍼 配方奶</span></label>
+    </div>
+    <div class="volume-input" id="volumeInputContainer">
+      <input type="number" id="volumeInput" min="0" placeholder="本次喂奶量 (ml)"><span>ml</span>
+    </div>
+    <button class="btn btn-feed" id="feedNowBtn">🍼 现在喂奶</button>
+    <div class="audio-control hidden" id="audioControlBar">
+      <span>🔊 提醒音频播放中</span>
+      <button id="stopAudioBtn">关闭音频</button>
+    </div>
+  </div>
+
+  <!-- 最近记录卡片 -->
+  <div class="card" style="margin-top:0;">
+    <div class="recent-header">
+      <span>📋 最近记录</span>
+      <span class="recent-toggle" id="toggleRecentRecords">收起 ∨</span>
+    </div>
+    <div id="recentRecordsContainer">
+      <ul class="record-list" id="recentFeedList" style="margin-bottom:4px;"></ul>
+      <ul class="record-list" id="recentExcreteList" style="margin-bottom:4px;"></ul>
+      <div class="empty" id="recentEmptyMsg" style="font-size:13px; padding:20px;">暂无记录</div>
+    </div>
+    <div class="recent-actions">
+      <button class="clear-btn" id="recentClearFeedBtn">清除喂奶记录</button>
+      <button class="clear-btn" id="recentClearExcreteBtn">清除排泄记录</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 喂奶记录页 ===== -->
+<div id="page-records" class="page">
+  <div style="display:flex; justify-content:space-between; align-items:center;">
+    <div style="font-size:20px; font-weight:600;">📋 喂奶记录</div>
+    <div><button class="export-btn" id="exportFeedBtn">导出</button></div>
+  </div>
+  <ul class="record-list" id="feedRecordList"></ul>
+  <div class="empty" id="feedEmptyMsg">暂无喂奶记录</div>
+</div>
+
+<!-- ===== 排泄记录页 ===== -->
+<div id="page-excrete" class="page">
+  <div class="card">
+    <div style="font-size:20px; font-weight:600; margin-bottom:16px;">🚽 记录排泄</div>
+    <div class="excrete-options">
+      <span style="font-weight:600;">类型：</span>
+      <label><input type="radio" name="excreteType" value="bowel" id="excreteBowel" checked><span class="type-btn active" id="bowelLabel">💩 大便</span></label>
+      <label><input type="radio" name="excreteType" value="pee" id="excretePee"><span class="type-btn" id="peeLabel">💧 小便</span></label>
+    </div>
+    <div class="volume-input" id="bowelStateContainer">
+      <select id="bowelState"><option value="normal">🟤 正常</option><option value="loose">🟡 稀便</option><option value="hard">🟠 干硬</option></select><span>状态</span>
+    </div>
+    <div class="volume-input"><input type="text" id="excreteNote" placeholder="备注（可选）"><span>备注</span></div>
+    <button class="btn btn-excrete" id="excreteNowBtn">📝 记录排泄</button>
+  </div>
+  <div style="display:flex; justify-content:space-between; align-items:center;">
+    <div style="font-size:20px; font-weight:600;">📋 排泄记录</div>
+    <div><button class="export-btn" id="exportExcreteBtn">导出</button></div>
+  </div>
+  <ul class="record-list" id="excreteRecordList"></ul>
+  <div class="empty" id="excreteEmptyMsg">暂无排泄记录</div>
+</div>
+
+<audio id="alarmAudio" preload="auto" src="https://easyvoice.ioplus.tech/api/v1/tts/download/zh-CN-XiaoxiaoNeural-%E5%96%9D%E5%A5%B6%E6%97%B6%E9%97%B4%E5%88%B0%E5%95%A6%EF%BC%81%E5%AE%9D%E5%AE%9D%E8%AF%A5-1782460773430.mp3"></audio>
+
+<script>
+(function() {
+  'use strict';
+
+  // ===================== 常量 =====================
+  var FEED_KEY = 'feeding_records';
+  var SETTINGS_KEY = 'feeding_settings';
+  var EXCRETE_KEY = 'excrete_records';
+
+  // ===================== 工具 =====================
+  function load(key) {
+    try { return JSON.parse(localStorage.getItem(key)) || []; } catch(e) { return []; }
+  }
+  function save(key, val) {
+    localStorage.setItem(key, JSON.stringify(val));
+  }
+  function $(id) {
+    return document.getElementById(id);
+  }
+  function fmtTime(iso) {
+    return new Date(iso).toLocaleString('zh-CN', { hour12: false });
+  }
+  function fmtDuration(ms) {
+    if (ms < 0) return '';
+    var mins = Math.floor(ms / 60000);
+    var h = Math.floor(mins / 60);
+    return h > 0 ? h + '小时' + (mins % 60) + '分钟' : mins + '分钟';
+  }
+  function downloadJSON(data, filename) {
+    var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  // ===================== 状态 =====================
+  var feedRecords = load(FEED_KEY);
+  var excreteRecords = load(EXCRETE_KEY);
+  var settings = load(SETTINGS_KEY) || {};
+  var nextFeedTime = settings.nextFeedTime || null;
+  var isPaused = false;
+  var remainingOnPause = null;
+  var countdownInterval = null;
+  var alarmPlaying = false;
+  var audioStopTimer = null;
+  var alarmFired = false;
+  var audioCtx = null;
+  var audioUnlocked = false;
+  var alarmAudio = $('alarmAudio');
+  var recentCollapsed = false;
+  var notifHandle = null;
+  var titleFlash = null;
+  var origTitle = document.title;
+
+  // ===================== 页面切换 =====================
+  function switchPage(id) {
+    var pages = ['page-timer', 'page-records', 'page-excrete'];
+    for (var i = 0; i < pages.length; i++) {
+      document.getElementById(pages[i]).classList.remove('active');
+    }
+    document.getElementById('page-' + id).classList.add('active');
+    var navs = document.querySelectorAll('.nav-item');
+    for (var j = 0; j < navs.length; j++) {
+      navs[j].classList.remove('active');
+    }
+    var target = document.querySelector('.nav-item[data-page="' + id + '"]');
+    if (target) target.classList.add('active');
+    if (id === 'records') renderFeedRecords();
+    if (id === 'excrete') renderExcreteRecords();
+  }
+
+  // ===================== 喂奶记录 CRUD =====================
+  function addFeedRecord(type, feedType, volume) {
+    var now = new Date();
+    var prev = feedRecords.length > 0 ? new Date(feedRecords[0].time) : null;
+    var diff = prev ? fmtDuration(now - prev) : '';
+    feedRecords.unshift({
+      type: type,
+      time: now.toISOString(),
+      diff: diff,
+      feedType: feedType,
+      volume: volume
+    });
+    save(FEED_KEY, feedRecords);
+    renderFeedRecords();
+    renderRecentRecords();
+  }
+
+  function deleteFeedRecord(idx) {
+    feedRecords.splice(idx, 1);
+    save(FEED_KEY, feedRecords);
+    renderFeedRecords();
+    renderRecentRecords();
+  }
+
+  function renderFeedRecords() {
+    var list = $('feedRecordList');
+    var empty = $('feedEmptyMsg');
+    list.innerHTML = '';
+    if (feedRecords.length === 0) {
+      empty.style.display = 'block';
+      return;
+    }
+    empty.style.display = 'none';
+    for (var i = 0; i < feedRecords.length; i++) {
+      var r = feedRecords[i];
+      var typeLabel = r.type === 'auto' ? '⏰ 定时' : '🍼 手动';
+      var feedTypeStr = r.feedType === 'breast' ? '🤱 母乳' : '🍼 配方奶';
+      var volumeStr = r.volume ? ' | ' + r.volume + ' ml' : '';
+      var li = document.createElement('li');
+      li.className = 'record-item';
+      li.innerHTML =
+        '<div class="record-left">' +
+          '<span class="record-time">' + fmtTime(r.time) + '</span>' +
+          (r.diff ? '<span class="record-interval">距上次: ' + r.diff + '</span>' : '') +
+          '<span class="record-detail">' + feedTypeStr + volumeStr + '</span>' +
+        '</div>' +
+        '<span class="record-type ' + r.type + '">' + typeLabel + '</span>' +
+        '<button class="delete-btn" data-idx="' + i + '">✕</button>';
+      list.appendChild(li);
+    }
+    var btns = list.querySelectorAll('.delete-btn');
+    for (var j = 0; j < btns.length; j++) {
+      btns[j].onclick = function() {
+        deleteFeedRecord(parseInt(this.getAttribute('data-idx')));
+      };
+    }
+  }
+
+  // ===================== 排泄记录 CRUD =====================
+  function addExcreteRecord() {
+    var isBowel = $('excreteBowel').checked;
+    var state = isBowel ? $('bowelState').value : null;
+    var note = $('excreteNote').value.trim();
+    var now = new Date();
+    var prev = excreteRecords.length > 0 ? new Date(excreteRecords[0].time) : null;
+    var diff = prev ? fmtDuration(now - prev) : '';
+    excreteRecords.unshift({
+      time: now.toISOString(),
+      type: isBowel ? 'bowel' : 'pee',
+      state: state,
+      note: note,
+      diff: diff
+    });
+    save(EXCRETE_KEY, excreteRecords);
+    $('excreteNote').value = '';
+    renderExcreteRecords();
+    renderRecentRecords();
+  }
+
+  function deleteExcreteRecord(idx) {
+    excreteRecords.splice(idx, 1);
+    save(EXCRETE_KEY, excreteRecords);
+    renderExcreteRecords();
+    renderRecentRecords();
+  }
+
+  function excreteTypeLabel(r) {
+    if (r.type === 'pee') return '💧 小便';
+    var map = { normal: '🟤 正常', loose: '🟡 稀便', hard: '🟠 干硬' };
+    return '💩 大便 (' + (map[r.state] || r.state) + ')';
+  }
+
+  function renderExcreteRecords() {
+    var list = $('excreteRecordList');
+    var empty = $('excreteEmptyMsg');
+    list.innerHTML = '';
+    if (excreteRecords.length === 0) {
+      empty.style.display = 'block';
+      return;
+    }
+    empty.style.display = 'none';
+    for (var i = 0; i < excreteRecords.length; i++) {
+      var r = excreteRecords[i];
+      var noteStr = r.note ? ' · ' + r.note : '';
+      var li = document.createElement('li');
+      li.className = 'record-item';
+      li.innerHTML =
+        '<div class="record-left">' +
+          '<span class="record-time">' + fmtTime(r.time) + '</span>' +
+          (r.diff ? '<span class="record-interval">距上次: ' + r.diff + '</span>' : '') +
+          '<span class="record-detail">' + excreteTypeLabel(r) + noteStr + '</span>' +
+        '</div>' +
+        '<button class="delete-btn" data-idx="' + i + '">✕</button>';
+      list.appendChild(li);
+    }
+    var btns = list.querySelectorAll('.delete-btn');
+    for (var j = 0; j < btns.length; j++) {
+      btns[j].onclick = function() {
+        deleteExcreteRecord(parseInt(this.getAttribute('data-idx')));
+      };
+    }
+  }
+
+  // ===================== 最近记录 =====================
+  function renderRecentRecords() {
+    var fl = $('recentFeedList');
+    var el = $('recentExcreteList');
+    var em = $('recentEmptyMsg');
+    fl.innerHTML = '';
+    el.innerHTML = '';
+    var hf = feedRecords.length > 0;
+    var he = excreteRecords.length > 0;
+    if (!hf && !he) {
+      em.style.display = 'block';
+      fl.style.display = 'none';
+      el.style.display = 'none';
+      return;
+    }
+    em.style.display = 'none';
+    fl.style.display = '';
+    el.style.display = '';
+
+    var maxF = Math.min(feedRecords.length, 5);
+    for (var i = 0; i < maxF; i++) {
+      var r = feedRecords[i];
+      var feedTypeStr = r.feedType === 'breast' ? '🤱 母乳' : '🍼 配方奶';
+      var volumeStr = r.volume ? ' | ' + r.volume + ' ml' : '';
+      var li = document.createElement('li');
+      li.className = 'record-item';
+      li.innerHTML =
+        '<div class="record-left">' +
+          '<span class="record-time">' + fmtTime(r.time) + '</span>' +
+          (r.diff ? '<span class="record-interval">距上次: ' + r.diff + '</span>' : '') +
+          '<span class="record-detail">' + feedTypeStr + volumeStr + '</span>' +
+        '</div>' +
+        '<button class="delete-btn" data-idx="' + i + '">✕</button>';
+      fl.appendChild(li);
+    }
+    var fbtns = fl.querySelectorAll('.delete-btn');
+    for (var k = 0; k < fbtns.length; k++) {
+      fbtns[k].onclick = function() {
+        deleteFeedRecord(parseInt(this.getAttribute('data-idx')));
+      };
+    }
+
+    var maxE = Math.min(excreteRecords.length, 5);
+    for (var j = 0; j < maxE; j++) {
+      var r2 = excreteRecords[j];
+      var noteStr = r2.note ? ' · ' + r2.note : '';
+      var li2 = document.createElement('li');
+      li2.className = 'record-item';
+      li2.innerHTML =
+        '<div class="record-left">' +
+          '<span class="record-time">' + fmtTime(r2.time) + '</span>' +
+          (r2.diff ? '<span class="record-interval">距上次: ' + r2.diff + '</span>' : '') +
+          '<span class="record-detail">' + excreteTypeLabel(r2) + noteStr + '</span>' +
+        '</div>' +
+        '<button class="delete-btn" data-idx="' + j + '">✕</button>';
+      el.appendChild(li2);
+    }
+    var ebtns = el.querySelectorAll('.delete-btn');
+    for (var m = 0; m < ebtns.length; m++) {
+      ebtns[m].onclick = function() {
+        deleteExcreteRecord(parseInt(this.getAttribute('data-idx')));
+      };
+    }
+  }
+
+  // ===================== 倒计时 =====================
+  function stopCountdown() {
+    if (countdownInterval) {
+      clearInterval(countdownInterval);
+      countdownInterval = null;
+    }
+  }
+
+  function updateDisplay() {
+    var cd = $('countdownDisplay');
+    if (isPaused) {
+      if (remainingOnPause !== null) {
+        var h = Math.floor(remainingOnPause / 3600000);
+        var m = Math.floor((remainingOnPause % 3600000) / 60000);
+        var s = Math.floor((remainingOnPause % 60000) / 1000);
+        cd.textContent = pad(h) + ':' + pad(m) + ':' + pad(s);
+      } else {
+        cd.textContent = '--:--:--';
+      }
+      return;
+    }
+    if (!nextFeedTime) {
+      cd.textContent = '--:--:--';
+      return;
+    }
+    var rem = nextFeedTime - Date.now();
+    if (rem <= 0) {
+      cd.textContent = '00:00:00';
+      return;
+    }
+    var h = Math.floor(rem / 3600000);
+    var m = Math.floor((rem % 3600000) / 60000);
+    var s = Math.floor((rem % 60000) / 1000);
+    cd.textContent = pad(h) + ':' + pad(m) + ':' + pad(s);
+  }
+
+  function pad(n) {
+    return String(n).padStart(2, '0');
+  }
+
+  function doTimerFire() {
+    stopCountdown();
+    clearAllAlerts();
+    // 倒计时结束后暂停，不自动重开
+    nextFeedTime = null;
+    settings.nextFeedTime = null;
+    save(SETTINGS_KEY, settings);
+    clearTimerInSW();
+    $('pauseBtn').disabled = true;
+    $('pauseBtn').style.opacity = '0.5';
+    $('countdownLabel').textContent = '⏰ 倒计时已结束，点击「设置并开始」重新计时';
+    updateDisplay();
+    fireAlarm();
+    addFeedRecord('auto', 'formula', null);
+  }
+
+  function startCountdown() {
+    stopCountdown();
+    if (isPaused || !nextFeedTime) return;
+    countdownInterval = setInterval(function() {
+      if (isPaused) return;
+      if (nextFeedTime - Date.now() <= 0) {
+        doTimerFire();
+      }
+      updateDisplay();
+    }, 200);
+  }
+
+  function doPause() {
+    if (!nextFeedTime || isPaused) return;
+    remainingOnPause = Math.max(0, nextFeedTime - Date.now());
+    isPaused = true;
+    stopCountdown();
+    clearTimerInSW();
+    $('pauseBtn').textContent = '▶️ 继续';
+    $('pauseBtn').classList.add('resume');
+    $('countdownLabel').textContent = '已暂停 (母乳喂养中)';
+  }
+
+  function doResume() {
+    if (!isPaused) return;
+    if (remainingOnPause !== null) {
+      nextFeedTime = Date.now() + remainingOnPause;
+      settings.nextFeedTime = nextFeedTime;
+      save(SETTINGS_KEY, settings);
+      sendTimerToSW(nextFeedTime);
+      remainingOnPause = null;
+    }
+    isPaused = false;
+    $('pauseBtn').textContent = '⏸️ 暂停';
+    $('pauseBtn').classList.remove('resume');
+    $('countdownLabel').textContent = '下次定时喂奶倒计时';
+    $('pauseBtn').disabled = false;
+    $('pauseBtn').style.opacity = '1';
+    alarmFired = false;
+    startCountdown();
+  }
+
+  function resetAndClearTimer() {
+    stopCountdown();
+    nextFeedTime = null;
+    settings.nextFeedTime = null;
+    save(SETTINGS_KEY, settings);
+    clearTimerInSW();
+    isPaused = false;
+    remainingOnPause = null;
+    alarmFired = false;
+    $('pauseBtn').textContent = '⏸️ 暂停';
+    $('pauseBtn').classList.remove('resume');
+    $('countdownLabel').textContent = '已清零，请重新设置间隔';
+    $('pauseBtn').disabled = true;
+    $('pauseBtn').style.opacity = '0.5';
+    updateDisplay();
+  }
+
+  // ===================== 音频 =====================
+  function unlockAudio() {
+    if (audioUnlocked) return;
+    try {
+      alarmAudio.play().then(function() {
+        alarmAudio.pause();
+        alarmAudio.currentTime = 0;
+      }).catch(function() {});
+      if (audioCtx === null || audioCtx.state === 'closed') {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      audioUnlocked = true;
+      document.removeEventListener('click', unlockAudio);
+      document.removeEventListener('touchstart', unlockAudio);
+    } catch(e) {}
+  }
+
+  function playAlarmSound() {
+    if (alarmPlaying) return;
+    alarmPlaying = true;
+    unlockAudio();
+    // 循环播放1分钟：播完自动重播，1分钟后停止
+    alarmAudio.loop = true;
+    alarmAudio.play().then(function() {
+      $('audioControlBar').classList.remove('hidden');
+    }).catch(function() {
+      playFallbackBeep();
+    });
+    if (audioStopTimer) clearTimeout(audioStopTimer);
+    audioStopTimer = setTimeout(stopAlarmSound, 60000); // 1分钟
+  }
+
+  function stopAlarmSound() {
+    alarmAudio.pause();
+    alarmAudio.currentTime = 0;
+    alarmAudio.loop = false;
+    alarmPlaying = false;
+    $('audioControlBar').classList.add('hidden');
+    if (audioStopTimer) {
+      clearTimeout(audioStopTimer);
+      audioStopTimer = null;
+    }
+  }
+
+  function playFallbackBeep() {
+    try {
+      unlockAudio();
+      if (audioCtx === null || audioCtx.state === 'closed') return;
+      var osc = audioCtx.createOscillator();
+      var gain = audioCtx.createGain();
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+      gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 2);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 2);
+      for (var i = 0; i < 3; i++) {
+        (function(delay) {
+          setTimeout(function() {
+            if (audioCtx && audioCtx.state !== 'closed') {
+              var o2 = audioCtx.createOscillator();
+              var g2 = audioCtx.createGain();
+              o2.type = 'square';
+              o2.frequency.setValueAtTime(800, audioCtx.currentTime);
+              g2.gain.setValueAtTime(0.5, audioCtx.currentTime);
+              g2.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 2);
+              o2.connect(g2);
+              g2.connect(audioCtx.destination);
+              o2.start();
+              o2.stop(audioCtx.currentTime + 2);
+            }
+          }, delay);
+        })((i + 1) * 3000);
+      }
+    } catch(e) {}
+  }
+
+  function fireAlarm() {
+    if (alarmFired) return;
+    alarmFired = true;
+    playAlarmSound();
+    showAlarmUI();
+  }
+
+  // ===================== 通知/提醒 =====================
+  function clearAllAlerts() {
+    if (notifHandle) {
+      try { notifHandle.close(); } catch(e) {}
+      notifHandle = null;
+    }
+    if (titleFlash) {
+      clearInterval(titleFlash);
+      titleFlash = null;
+    }
+    document.title = origTitle;
+    document.body.classList.remove('alarming');
+    var toast = document.querySelector('.toast-overlay');
+    if (toast) toast.remove();
+    stopAlarmSound();
+    alarmAudio.currentTime = 0;
+    alarmFired = false;
+  }
+
+  function showAlarmToast() {
+    var overlay = document.createElement('div');
+    overlay.className = 'toast-overlay';
+    overlay.innerHTML = '<div class="toast-box"><h2>🍼 喂奶时间到！</h2><p>宝宝该喂奶了</p><button id="closeAlarmBtn">我知道了</button></div>';
+    document.body.appendChild(overlay);
+    document.getElementById('closeAlarmBtn').onclick = function() {
+      overlay.remove();
+      clearAllAlerts();
+    };
+  }
+
+  function showAlarmUI() {
+    document.body.classList.add('alarming');
+    var flash = true;
+    titleFlash = setInterval(function() {
+      document.title = flash ? '🔔 喂奶！！' : '🍼 该喂奶了！';
+      flash = !flash;
+    }, 800);
+    if (Notification.permission === 'granted') {
+      try {
+        notifHandle = new Notification('🍼 喂奶时间到！', {
+          body: '宝宝该喂奶了',
+          icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">🍼</text></svg>',
+          vibrate: [500,200,500,200,500],
+          requireInteraction: true,
+          tag: 'feeding-alarm-v2',
+          renotify: true
+        });
+        notifHandle.onclick = function() {
+          window.focus();
+          fireAlarm();
+          clearAllAlerts();
+        };
+      } catch(e) {
+        showAlarmToast();
+      }
+    } else {
+      showAlarmToast();
+    }
+    if (navigator.vibrate) navigator.vibrate([500,200,500,200,500]);
+  }
+
+  // ===================== Service Worker =====================
+  function registerServiceWorker() {
+    if (!('serviceWorker' in navigator)) return;
+    navigator.serviceWorker.addEventListener('message', function(e) {
+      var data = e.data;
+      if (!data) return;
+      if (data.type === 'TIMER_FIRED' || data.type === 'NOTIFICATION_CLICKED') {
+        if (data.type === 'NOTIFICATION_CLICKED') window.focus();
+        fireAlarm();
+      }
+    });
+    navigator.serviceWorker.register('service-worker.js').then(function(reg) {
+      if (Notification.permission === 'default') Notification.requestPermission();
+    }).catch(function(err) {
+      console.warn('SW注册失败:', err);
+    });
+  }
+
+  function sendTimerToSW(endTime) {
+    if (!navigator.serviceWorker || !navigator.serviceWorker.controller) return;
+    navigator.serviceWorker.controller.postMessage({ type: 'SET_TIMER', endTime: endTime });
+  }
+
+  function clearTimerInSW() {
+    if (!navigator.serviceWorker || !navigator.serviceWorker.controller) return;
+    navigator.serviceWorker.controller.postMessage({ type: 'CLEAR_TIMER' });
+  }
+
+  // ===================== 可见性 =====================
+  document.addEventListener('visibilitychange', function() {
+    if (document.hidden) return;
+    if (nextFeedTime && Date.now() >= nextFeedTime && !alarmFired) {
+      fireAlarm();
+      addFeedRecord('auto', 'formula', null);
+      var mins = settings.intervalMinutes || 180;
+      nextFeedTime = Date.now() + mins * 60000;
+      settings.nextFeedTime = nextFeedTime;
+      save(SETTINGS_KEY, settings);
+      sendTimerToSW(nextFeedTime);
+      startCountdown();
+    }
+  });
+
+  // ===================== 事件绑定 =====================
+  function bindEvents() {
+    // 底部导航
+    var navItems = document.querySelectorAll('.nav-item');
+    for (var i = 0; i < navItems.length; i++) {
+      navItems[i].onclick = function() {
+        var page = this.getAttribute('data-page');
+        if (page) switchPage(page);
+      };
+    }
+
+    $('pauseBtn').onclick = function() {
+      isPaused ? doResume() : doPause();
+    };
+
+    $('setIntervalBtn').onclick = function() {
+      var mins = parseInt($('intervalInput').value, 10);
+      if (isNaN(mins) || mins < 1) {
+        alert('请输入有效的分钟数（≥1）');
+        return;
+      }
+      clearAllAlerts();
+      settings.intervalMinutes = mins;
+      isPaused = false;
+      remainingOnPause = null;
+      $('pauseBtn').textContent = '⏸️ 暂停';
+      $('pauseBtn').classList.remove('resume');
+      nextFeedTime = Date.now() + mins * 60000;
+      settings.nextFeedTime = nextFeedTime;
+      save(SETTINGS_KEY, settings);
+      sendTimerToSW(nextFeedTime);
+      $('countdownLabel').textContent = '下次定时喂奶倒计时';
+      $('pauseBtn').disabled = false;
+      $('pauseBtn').style.opacity = '1';
+      startCountdown();
+      updateDisplay();
+    };
+
+    $('feedNowBtn').onclick = function() {
+      clearAllAlerts();
+      var feedType = $('feedTypeBreast').checked ? 'breast' : 'formula';
+      var vol = null;
+      if (feedType === 'formula') {
+        vol = $('volumeInput').value ? parseInt($('volumeInput').value, 10) : null;
+      }
+      if (feedType === 'breast') {
+        addFeedRecord('manual', 'breast', null);
+        if (!isPaused && nextFeedTime && nextFeedTime > Date.now()) doPause();
+      } else {
+        addFeedRecord('manual', 'formula', vol);
+        resetAndClearTimer();
+      }
+      $('volumeInput').value = '';
+      $('feedTypeBreast').onchange();
+    };
+
+    $('feedTypeBreast').onchange = function() {
+      if ($('feedTypeBreast').checked) {
+        $('breastLabel').className = 'type-btn active';
+        $('formulaLabel').className = 'type-btn';
+        $('volumeInputContainer').classList.add('disabled');
+        $('volumeInput').value = '';
+      } else {
+        $('formulaLabel').className = 'type-btn formula-active';
+        $('breastLabel').className = 'type-btn';
+        $('volumeInputContainer').classList.remove('disabled');
+      }
+    };
+    $('feedTypeFormula').onchange = $('feedTypeBreast').onchange;
+
+    $('excreteBowel').onchange = function() {
+      var isB = $('excreteBowel').checked;
+      $('bowelLabel').className = isB ? 'type-btn active' : 'type-btn';
+      $('peeLabel').className = isB ? 'type-btn' : 'type-btn active';
+      $('bowelStateContainer').style.display = isB ? 'flex' : 'none';
+    };
+    $('excretePee').onchange = $('excreteBowel').onchange;
+
+    $('excreteNowBtn').onclick = addExcreteRecord;
+
+    $('exportFeedBtn').onclick = function() {
+      if (feedRecords.length === 0) { alert('没有喂奶记录'); return; }
+      downloadJSON(feedRecords, 'feeding_' + new Date().toISOString().slice(0,10) + '.json');
+    };
+    $('exportExcreteBtn').onclick = function() {
+      if (excreteRecords.length === 0) { alert('没有排泄记录'); return; }
+      downloadJSON(excreteRecords, 'excrete_' + new Date().toISOString().slice(0,10) + '.json');
+    };
+
+    $('stopAudioBtn').onclick = stopAlarmSound;
+
+    $('recentClearFeedBtn').onclick = function() {
+      if (confirm('确定清除所有喂奶记录吗？')) {
+        feedRecords = [];
+        save(FEED_KEY, feedRecords);
+        renderFeedRecords();
+        renderRecentRecords();
+      }
+    };
+    $('recentClearExcreteBtn').onclick = function() {
+      if (confirm('确定清除所有排泄记录吗？')) {
+        excreteRecords = [];
+        save(EXCRETE_KEY, excreteRecords);
+        renderExcreteRecords();
+        renderRecentRecords();
+      }
+    };
+
+    $('toggleRecentRecords').onclick = function() {
+      recentCollapsed = !recentCollapsed;
+      $('recentRecordsContainer').style.display = recentCollapsed ? 'none' : '';
+      this.textContent = recentCollapsed ? '展开 ∨' : '收起 ∨';
+    };
+  }
+
+  // ===================== 初始化 =====================
+  function init() {
+    // 导航（优先绑定，防止后续报错影响）
+    bindEvents();
+
+    // 音频解锁
+    document.addEventListener('click', unlockAudio);
+    document.addEventListener('touchstart', unlockAudio);
+
+    // SW
+    registerServiceWorker();
+
+    // 通知权限
+    if (Notification.permission === 'default') Notification.requestPermission();
+    var pw = $('permissionWarning');
+    if (Notification.permission !== 'granted') {
+      pw.textContent = '通知权限未授予，息屏时将不会弹出通知提醒。';
+      pw.style.display = 'block';
+    }
+
+    // UI 还原
+    $('intervalInput').value = settings.intervalMinutes || 180;
+
+    if (settings.intervalMinutes && nextFeedTime && nextFeedTime > Date.now()) {
+      isPaused = false;
+      $('pauseBtn').disabled = false;
+      $('pauseBtn').style.opacity = '1';
+      startCountdown();
+    } else if (settings.intervalMinutes) {
+      resetAndClearTimer();
+    } else {
+      $('pauseBtn').disabled = true;
+      $('pauseBtn').style.opacity = '0.5';
+    }
+
+    updateDisplay();
+    renderFeedRecords();
+    renderExcreteRecords();
+    renderRecentRecords();
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>

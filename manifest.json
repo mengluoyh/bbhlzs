@@ -1,0 +1,9 @@
+{
+  "name": "宝宝护理助手",
+  "short_name": "宝宝护理",
+  "start_url": "index.html",
+  "display": "standalone",
+  "theme_color": "#e07a5f",
+  "background_color": "#f5f0eb",
+  "icons": []
+}
