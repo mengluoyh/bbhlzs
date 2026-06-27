@@ -1,4 +1,5 @@
 name: Build APK
+
 on:
   push:
     branches: [main]
@@ -9,17 +10,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
         with:
           node-version: 18
+
       - name: Install Bubblewrap
         run: npm install -g @bubblewrap/cli
-      - name: Initialize and build
+
+      - name: Initialize and Build APK
         run: |
-          bubblewrap init --manifest=https://mengluoyh.github.io/baby-care/manifest.json
+          # ⚠️ 替换成你的 GitHub Pages 地址
+          bubblewrap init --manifest=https://menglouyh.github.io/bbhlzs/manifest.json
           bubblewrap build
-      - name: Upload APK
+
+      - name: Upload APK as Artifact
         uses: actions/upload-artifact@v3
         with:
-          name: app-release
+          name: baby-care-apk
           path: app-release-signed.apk
